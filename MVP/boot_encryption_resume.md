@@ -81,38 +81,43 @@ flowchart TD
     
     E -->|Disque chiffré| F[Clevis Client]
     
+    F -->|Lit| P[LUKS Header<br/>1028 kB]
+    P -->|Contient| Q[Sealed Blob<br/>JWE Token]
+    
     F -->|Génère| R[Paire de clés<br/>Éphémère EC]
-    R -->|Clé publique| H
+    
     F -->|TPM Pin| TPM
     F -->|Tang Pin| H[Serveur Tang<br/>Network]
-    F -->|Shamir Secret Sharing| I[Reconstruction clé]
+    
+    R -->|Clé publique| H
+    
+    subgraph TPM[TPM 2.0]
+        SRK[SRK - Storage Root Key<br/>Clé privée interne]
+        PCR[Registres PCR<br/>Valeurs actuelles]
+        J{État intégrité?}
+        U[Unseal du blob<br/>Déchiffrement]
+    end
+    
+    Q -->|Blob scellé| U
+    PCR -->|Flux valeurs| J
+    SRK --> |Utilisé pour le déchiffrement| U
+    J -->|Valide| U
+    J -->|Invalide| K[Échec démarrage]
+    U -->|Secret libéré| I[Reconstruction clé<br/>Shamir Secret Sharing]
     
     H -->|Signe avec clé<br/>privée Tang| S[JWT de réponse]
     S -->|Retourne| I
     
-    subgraph TPM[TPM 2.0]
-        SRK[SRK - Storage Root Key<br/>Clé privée interne]
-        J{État intégrité?}
-    end
-    
-    TPM -->|Lit PCR| J
-    SRK -.->|Déchiffre le blob| J
-    
-    J -->|Valide| I
-    J -->|Invalide| K[Échec démarrage]
-    
     I -->|Clé reconstruite| L[LUKS Key Slot]
     L -->|Déverrouille| M[dm-crypt<br/>Device Mapper]
     M -->|Déchiffre on-the-fly| N[Système fichiers<br/>Racine /]
-    
-    P[LUKS Header<br/>1028 kB] -->|Contient| Q[Sealed Blob<br/>JWE Token]
-    Q -->|Envoyé pour<br/>unsealing| TPM
     
     style A fill:#e1f5fe
     style TPM fill:#fff3e0
     style H fill:#f3e5f5
     style M fill:#e8f5e9
     style N fill:#c8e6c9
+
 ```
 
 ## 6. Intégrité et limitations de sécurité
@@ -131,4 +136,3 @@ La sécurité des données au repos résulte d'une synergie entre LUKS2 pour le 
 
 
 --------------------------------------------------------------------------------
-
